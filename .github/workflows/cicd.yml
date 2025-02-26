@@ -1,0 +1,85 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Instalar dependências
+        run: npm install
+
+      - name: Executar testes unitários
+        run: npm test
+
+      - name: Construir aplicação
+        run: npm run build
+
+      - name: Armazenar artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-build
+          path: dist/
+
+  release:
+    name: Criar Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar artefato
+        uses: actions/download-artifact@v4
+        with:
+          name: app-build
+          path: dist/
+
+      - name: Criar Release no GitHub
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: "Release v1.0.${{ github.run_number }}"
+          files: dist/**
+
+  deploy:
+    name: Deploy para Teste
+    needs: release
+    runs-on: ubuntu-latest
+    environment: teste  # Restringe deploy para um usuário/grupo
+
+    steps:
+      - name: Baixar artefato
+        uses: actions/download-artifact@v4
+        with:
+          name: app-build
+          path: dist/
+
+      - name: Executar Deploy
+        run: |
+          echo "Deploy em andamento..."
+          # Comando de deploy aqui (exemplo: copiar para um servidor)
+
+  notify:
+    name: Notificar Falha
+    if: failure()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Enviar e-mail em caso de falha
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USER }}
+          password: ${{ secrets.EMAIL_PASS }}
+          subject: "Falha no Pipeline CI/CD"
+          body: "Erro no pipeline. Verifique os logs no GitHub Actions."
+          to: "dev@empresa.com"
+          from: "CI/CD Pipeline"
